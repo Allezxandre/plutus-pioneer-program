@@ -14,41 +14,47 @@ import           Control.Monad        hiding (fmap)
 import           Data.Map             as Map
 import           Data.Text            (Text)
 import           Data.Void            (Void)
-import           Plutus.Contract      hiding (when)
-import           PlutusTx             (Data (..))
-import qualified PlutusTx
-import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
 import           Ledger               hiding (singleton)
+import           Ledger.Ada           as Ada
 import           Ledger.Constraints   as Constraints
 import qualified Ledger.Scripts       as Scripts
 import qualified Ledger.Typed.Scripts as Scripts
-import           Ledger.Ada           as Ada
-import           Playground.Contract  (printJson, printSchemas, ensureKnownCurrencies, stage)
+import           Playground.Contract  (ensureKnownCurrencies, printJson,
+                                       printSchemas, stage)
 import           Playground.TH        (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types     (KnownCurrency (..))
+import           Plutus.Contract      hiding (when)
+import           PlutusTx             (Data (..))
+import qualified PlutusTx
+import           PlutusTx.Prelude     hiding (Semigroup (..), unless)
 import           Prelude              (Semigroup (..))
 import           Text.Printf          (printf)
 
 {-# INLINABLE mkValidator #-}
 -- This should validate if and only if the two Booleans in the redeemer are equal!
 mkValidator :: () -> (Bool, Bool) -> ValidatorCtx -> Bool
-mkValidator _ _ _ = True -- FIX ME!
+mkValidator _ (r1, r2) _ = r1 == r2
 
 data Typed
 instance Scripts.ScriptType Typed where
--- Implement the instance!
+    type instance DatumType Typed = ()
+    type instance RedeemerType Typed = (Bool, Bool)
 
 inst :: Scripts.ScriptInstance Typed
-inst = undefined -- FIX ME!
+inst = Scripts.validator @Typed
+    $$(PlutusTx.compile [|| mkValidator ||])
+    $$(PlutusTx.compile [|| wrap ||])
+  where
+    wrap = Scripts.wrapValidator @() @(Bool, Bool)
 
 validator :: Validator
-validator = undefined -- FIX ME!
+validator = Scripts.validatorScript inst
 
 valHash :: Ledger.ValidatorHash
-valHash = undefined -- FIX ME!
+valHash = Scripts.validatorHash validator
 
 scrAddress :: Ledger.Address
-scrAddress = undefined -- FIX ME!
+scrAddress = ScriptAddress valHash
 
 type GiftSchema =
     BlockchainActions
